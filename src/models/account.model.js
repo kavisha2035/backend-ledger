@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const ledgerModel=require("./ledger.model")
+const ledgerModel = require("./ledger.model")
 
 // You must use "new mongoose.Schema" here
 const accountSchema = new mongoose.Schema({
@@ -21,6 +21,10 @@ const accountSchema = new mongoose.Schema({
         type: String,
         required: [true, "Currency is required for creating an account"],
         default: "INR"
+    }, systemUser: {
+        type: Boolean,
+        default: false,
+        index: true
     }
 }, {
     timestamps: true
@@ -29,52 +33,52 @@ const accountSchema = new mongoose.Schema({
 // This will work perfectly now
 accountSchema.index({ user: 1, status: 1 });
 
-accountSchema.methods.getBalance=async function(){
-    const balanceData=await ledgerModel.aggregate([
-    {$match:{account:this._id}},
-    {
-        $group:{
-            _id:null,
-            totalDebit:{
-                $sum:{
-                    $cond:[
-                        {
-                            $eq:["$type","DEBIT"]
-                        },
-                        "$amount",
-                        0
-                    ]
+accountSchema.methods.getBalance = async function () {
+    const balanceData = await ledgerModel.aggregate([
+        { $match: { account: this._id } },
+        {
+            $group: {
+                _id: null,
+                totalDebit: {
+                    $sum: {
+                        $cond: [
+                            {
+                                $eq: ["$type", "DEBIT"]
+                            },
+                            "$amount",
+                            0
+                        ]
+                    }
+                },
+                totalCredits: {
+                    $sum: {
+                        $cond: [
+                            { $eq: ["$type", "CREDIT"] },
+                            "$amount",
+                            0
+                        ]
+                    }
                 }
-            },
-            totalCredits:{
-                $sum:{
-                    $cond:[
-                        { $eq:["$type","CREDIT"]},
-                        "$amount",
-                        0
-                    ]
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                balance: {
+                    $subtract: ["$totalCredit", "$totalDebit"]
                 }
             }
         }
-    },
-    {
-        $project:{
-            _id:0,
-            balance:{
-                $subtract:["$totalCredit","$totalDebit"]
-            }
-        }
+
+
+
+
+    ])
+
+    if (balanceData.length === 0) {
+        return 0
     }
-
-
-
-
-])
-
-if(balanceData.length===0){
-    return 0
-}
-return balanceData[0].balance 
+    return balanceData[0].balance
 
 }
 
