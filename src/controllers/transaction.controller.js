@@ -12,7 +12,7 @@ async function createTransaction(req, res) {
             message: "FromAccount, toAccount, amount and idempotency are required"
         });
     }
-    
+
     const fromUserAccount = await accountModel.findOne({
         _id: fromAccount,
     });
@@ -33,7 +33,7 @@ async function createTransaction(req, res) {
     const isTransactionAlreadyExists = await transactionModel.findOne({
         idempotencyKey: idempotencyKey,
     });
-    
+
     if (isTransactionAlreadyExists) {
         if (isTransactionAlreadyExists.status === "COMPLETED") {
             return res.status(200).json({
@@ -117,7 +117,7 @@ async function createTransaction(req, res) {
         await emailService.sendTransactionEmail(req.user.email, req.user.name, amount, toAccount);
 
         return res.status(201).json({
-            message: "Transaction completed successfully "
+            message: "Transaction completed successfully"
         });
     } catch (error) {
         await session.abortTransaction();
@@ -150,16 +150,12 @@ async function createInitialFundsTransaction(req, res) {
     });
 
     console.log("====================================");
-console.log("🔍 REAL PROBLEM DEBUG LOG:");
-console.log("Token User ID:", req.user ? req.user._id : "NO USER IN TOKEN");
-console.log("Found DB Account?:", fromUserAccount ? "YES" : "NO (NULL)");
-console.log("====================================");
+    console.log("🔍 REAL PROBLEM DEBUG LOG:");
+    console.log("Token User ID:", req.user ? req.user._id : "NO USER IN TOKEN");
+    console.log("Found DB Account?:", fromUserAccount ? "YES" : "NO (NULL)");
+    console.log("====================================");
 
-if (!fromUserAccount) {
-    return res.status(400).json({
-        message: "Invalid account "
-    });
-}
+    
 
     if (!fromUserAccount) {
         return res.status(400).json({
@@ -187,6 +183,10 @@ if (!fromUserAccount) {
             type: "DEBIT"
         }], { session });
 
+        await (()=>{
+            return new Promise((resolve)=>setTimeout(resolve,100*1000))
+        })()
+
         const creditLedgerEntry = await ledgerModel.create([{
             account: toAccount,
             amount: amount,
@@ -194,15 +194,22 @@ if (!fromUserAccount) {
             type: "CREDIT"
         }], { session });
 
-        const targetTransaction = transaction[0];
-        targetTransaction.status = "COMPLETED";
-        await targetTransaction.save({ session });
+        await transactionModel.findOneAndUpdate(
+            {_id:transaction._id},
+            {status:"COMPLETED"},
+            {session}
+        )
+
+        // const targetTransaction = transaction[0];
+        // targetTransaction.status = "COMPLETED";
+        // await targetTransaction.save({ session });
 
         await session.commitTransaction();
         session.endSession();
 
         return res.status(201).json({
-            message: "Initial fund transaction completed successfully "
+            message: "Initial fund transaction completed successfully ",
+            transaction: transaction
         });
     } catch (error) {
         await session.abortTransaction();

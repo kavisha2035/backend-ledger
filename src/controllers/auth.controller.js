@@ -1,6 +1,7 @@
 const userModel = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 const emailService=require("../services/email.service");
+const tokenBlackListModel=require("../models/blackList.model");
 // here we are creating a new user after checking for the existing user 
 
 // Added 'async' here so you can use 'await'
@@ -71,8 +72,28 @@ async function userLoginController(req,res){
 }
 
 
+// logout controller
+async function userLogoutController(req,res){
+    const token=req.cookies.token || req.headers.authorization?.split(" ")[1]
+    if(!token){
+        return res.status(200).json({
+            message:"user logout successfully"
+        })
+    }
+
+    res.cookie("token","")
+    await tokenBlackListModel.create({
+        token:token
+    })
+
+    res.status(200).json({
+        message:"User logged out successfully"
+    })
+}
+
 
 module.exports = {
     userRegisterController,
-    userLoginController 
+    userLoginController,
+    userLogoutController
 };
