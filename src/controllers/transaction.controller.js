@@ -230,10 +230,9 @@ async function createInitialFundsTransaction(req, res) {
             return res.status(400).json({ message: "Invalid account" });
         }
 
-        const fromUserAccount = await prisma.account.findFirst({
+                const fromUserAccount = await prisma.account.findFirst({
             where: {
-                systemUser: true,
-                userId: req.user.id
+                systemUser: true
             }
         });
 
