@@ -1,16 +1,46 @@
-const {Router}=require("express")
-const authMiddleware=require("../middleware/auth.middleware")
-const transactionController=require("../controllers/transaction.controller")
+const { Router } = require("express");
+const authMiddleware = require("../middleware/auth.middleware");
+const transactionController = require("../controllers/transaction.controller");
+const validate = require("../middleware/validation.middleware");
+const { transactionSchema, initialFundsSchema } = require("../middleware/schemas");
 
+const transactionRoutes = Router();
 
-const transactionRoutes=Router();
+// GET /api/transactions (Fetch paginated, filtered transaction history)
+transactionRoutes.get(
+    "/",
+    authMiddleware.authMiddleware,
+    transactionController.getTransactionsController
+);
 
-//create a new transaction
-// POST /api/transactions
-transactionRoutes.post("/",authMiddleware.authMiddleware,transactionController.createTransaction)
+// GET /api/transactions/export (Download CSV ledger statement)
+transactionRoutes.get(
+    "/export",
+    authMiddleware.authMiddleware,
+    transactionController.exportStatementController
+);
 
-//-POST api/transactions/system/initial-funds
-// cerate initial funds transaction from system user 
+// POST /api/transactions (Initiate transaction with Zod validation)
+transactionRoutes.post(
+    "/",
+    authMiddleware.authMiddleware,
+    validate(transactionSchema),
+    transactionController.createTransaction
+);
 
-transactionRoutes.post("/system/initial-funds",authMiddleware.authSystemUserMiddleware,transactionController.createInitialFundsTransaction)
-module.exports=transactionRoutes;
+// POST /api/transactions/system/initial-funds (Seed account with Zod validation)
+transactionRoutes.post(
+    "/system/initial-funds",
+    authMiddleware.authSystemUserMiddleware,
+    validate(initialFundsSchema),
+    transactionController.createInitialFundsTransaction
+);
+
+// DELETE /api/transactions/:id (Soft delete — sets deletedAt timestamp)
+transactionRoutes.delete(
+    "/:id",
+    authMiddleware.authMiddleware,
+    transactionController.softDeleteTransaction
+);
+
+module.exports = transactionRoutes;

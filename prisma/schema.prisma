@@ -1,0 +1,165 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  name       String
+  password   String
+  systemUser Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  accounts      Account[]
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+}
+
+model Account {
+  id         String        @id @default(uuid())
+  userId     String
+  status     AccountStatus @default(ACTIVE)
+  currency   String        @default("INR")
+  systemUser Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  user                 User          @relation(fields: [userId], references: [id])
+  ledgerEntries        LedgerEntry[]
+  sentTransactions     Transaction[] @relation("FromAccount")
+  receivedTransactions Transaction[] @relation("ToAccount")
+  balanceCache         BalanceCache?
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model Transaction {
+  id             String            @id @default(uuid())
+  fromAccountId  String
+  toAccountId    String
+  amount         Decimal           @db.Decimal(15, 2)
+  status         TransactionStatus @default(PENDING)
+  idempotencyKey String            @unique
+  description    String?
+  deletedAt      DateTime?         // Soft delete — banks never permanently delete records
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  fromAccount   Account       @relation("FromAccount", fields: [fromAccountId], references: [id])
+  toAccount     Account       @relation("ToAccount", fields: [toAccountId], references: [id])
+  ledgerEntries LedgerEntry[]
+
+  @@index([fromAccountId])
+  @@index([toAccountId])
+  @@index([idempotencyKey])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([deletedAt])
+}
+
+// Immutability enforced at the application layer.
+// PostgreSQL row-level security can reinforce this in production.
+model LedgerEntry {
+  id            String    @id @default(uuid())
+  accountId     String
+  transactionId String
+  amount        Decimal   @db.Decimal(15, 2)
+  type          EntryType
+  createdAt     DateTime  @default(now())
+
+  account     Account     @relation(fields: [accountId], references: [id])
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+
+  @@index([accountId])
+  @@index([transactionId])
+  @@index([accountId, type])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  family    String   // for token family revocation
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([family])
+}
+
+model TokenBlacklist {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// ─── Balance Cache ──────────────────────────────────────────────────────────────
+// Maintains a cached balance per account for O(1) reads instead of O(n) ledger aggregation.
+// The `version` field enables optimistic locking — updates only succeed if the version matches.
+// Nightly reconciliation compares cached values against the ledger source of truth.
+model BalanceCache {
+  id               String    @id @default(uuid())
+  accountId        String    @unique
+  cachedBalance    Decimal   @db.Decimal(15, 2) @default(0)
+  version          Int       @default(0)
+  lastReconciledAt DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+}
+
+// ─── Audit Log ──────────────────────────────────────────────────────────────────
+// Every critical action is logged for compliance, debugging, and interview brownie points.
+// Fire-and-forget inserts — never block the main request path.
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String   // e.g., "USER_LOGIN", "TRANSFER_COMPLETED"
+  entity    String?  // e.g., "Transaction", "Account"
+  entityId  String?  // ID of the affected entity
+  metadata  Json?    // Additional context (amount, old/new values, etc.)
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+enum AccountStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum EntryType {
+  CREDIT
+  DEBIT
+}
