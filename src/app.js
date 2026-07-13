@@ -3,8 +3,30 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 
 const app = express();
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://backend-ledger-ten.vercel.app",
+    "https://backend-ledger-git-main-kavisha2035-7094s-projects.vercel.app"
+];
+
+if (process.env.CLIENT_URL) {
+    const urls = process.env.CLIENT_URL.split(",").map(url => url.trim());
+    urls.forEach(url => {
+        if (url && !allowedOrigins.includes(url)) {
+            allowedOrigins.push(url);
+        }
+    });
+}
+
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, postman, curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            return callback(new Error("CORS policy mismatch"), false);
+        }
+        return callback(null, true);
+    },
     credentials: true
 }));
 app.use(express.json());
