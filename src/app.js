@@ -22,10 +22,15 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps, postman, curl)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
+
+        const isAllowed = allowedOrigins.includes(origin);
+        const isVercelPreview = origin.startsWith("https://backend-ledger-") && origin.endsWith(".vercel.app");
+
+        if (isAllowed || isVercelPreview) {
+            return callback(null, true);
+        } else {
             return callback(new Error("CORS policy mismatch"), false);
         }
-        return callback(null, true);
     },
     credentials: true
 }));
