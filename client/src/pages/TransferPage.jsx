@@ -266,14 +266,14 @@ const TransferPage = () => {
                 {transferType === "other" ? (
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                      Beneficiary Account ID (Mongoose ObjectID)
+                      Beneficiary Account ID (UUID)
                     </label>
                     <input
                       type="text"
                       required
                       value={beneficiary}
                       onChange={(e) => setBeneficiary(e.target.value)}
-                      placeholder="e.g. 6669c5e396655c68b444b05a"
+                      placeholder="e.g. 6a900718-443d-4ab0-a69e-fc657033e503"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-smooth"
                     />
                   </div>
